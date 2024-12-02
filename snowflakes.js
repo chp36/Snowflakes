@@ -14,10 +14,10 @@ var createScene = function () {
     const positions = [];
     const indices = [];
     const normals = [];
-    const areaSize = { x: 5, y: 5, z: 5 };
+    const areaSize = { x: 10, y: 5, z: 10 };
     const radius = 0.1;
     const tessellation = 8;
-    const numSnowflakes = 100;
+    const numSnowflakes = 1000;
 
     // Create the base snowflake geometry (a disc) and get its vertex data
     const baseSnowflake = BABYLON.MeshBuilder.CreateDisc("baseSnowflake", { radius, tessellation }, scene);
@@ -75,34 +75,35 @@ var createScene = function () {
         attribute vec3 position;
         uniform mat4 worldViewProjection;
         uniform float time;
-        uniform float seed;  // Unique seed for each snowflake
-        varying vec3 vPos;
         varying float isVisible;
 
         void main() {
             vec3 updatedPosition = position;
 
-            // Apply a sinusoidal function to the vertical movement of each snowflake
-            // This creates the hovering effect with different rates for each snowflake
-            updatedPosition.y -= time * 0.5 + 0.1 * sin(time * seed * 2.0);  // Adding sin(time * seed) for variation
+            // Time-based approach (not working yet)
+            // float modTime = mod(time, 20.0);
+            // float changeY = modTime * 0.5 + 0.1 * sin(time * 2.0);
+            // updatedPosition.y -= changeY;
 
-            // Apply a sinusoidal function to the horizontal movement (z-direction) of each snowflake
-            // This creates the side-to-side effect with different rates for each snowflake
-            updatedPosition.x += sin(time * seed * 1.5) * 0.25;  // Adjust multiplier for varying speeds
+            // Position-based approach
+            // This creates a hovering effect with different rates for each snowflake
+            updatedPosition.y -= time; // ** Make this equation fancy **
+            updatedPosition.y = mod(updatedPosition.y, 10.);
+            updatedPosition.y -= 1.;
 
+            // Side-to-side movement with different rates for each snowflake based on position
+            updatedPosition.x += sin(1.5 * updatedPosition.y) * 0.25; // ** Make this equation fancy **
 
-            // Mark the snowflake as visible if it's within the bounds
             if (updatedPosition.y < -1.0) {
-                // Reset to the top if it falls off the screen
-                updatedPosition.y += 11.0;  // Reset to a position above the visible area
-                isVisible = 1.0;  // Make the snowflake visible again
-            } else {
-                // Set the visibility to 1 when it's within bounds and falling
+                // Reset position to above visible area
+                updatedPosition.y += 10.0;
+            } else if (updatedPosition.y < 0.0) {
+                // Invisible, out of bounds
+                isVisible = 0.0;
+            } else if (updatedPosition.y < 8.0) {
+                // Visible, in bounds
                 isVisible = 1.0;
             }
-
-            // Pass updated position to fragment shader
-            vPos = updatedPosition;
 
             // Set the new position of the snowflake
             gl_Position = worldViewProjection * vec4(updatedPosition, 1.0);
@@ -112,17 +113,11 @@ var createScene = function () {
     // Fragment Shader
     const fragmentShader = `
         precision highp float;
-        varying vec3 vPos;
         varying float isVisible;
-
+        
         void main() {
-            // Only display the snowflake if it's visible (isVisible = 1.0)
-            if (isVisible < 1.0 || vPos.y < 0.0 || vPos.y > 10.0) {
-                discard;  // Discard fragments outside the visible area
-            }
-
             // Set the color of the snowflake (white)
-            gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+            gl_FragColor = vec4(1., 1., 1., isVisible);
         }
     `;
 
@@ -132,14 +127,10 @@ var createScene = function () {
         fragmentSource: fragmentShader,
     }, {
         attributes: ["position"],
-        uniforms: ["world", "worldViewProjection", "time", "seed"], // Include 'seed' uniform
+        uniforms: ["world", "worldViewProjection", "time"],
     });
 
-    // Set the seed value for each snowflake
-    for (let i = 0; i < numSnowflakes; i++) {
-        shaderMaterial.setFloat("seed", Math.random() * 2.0 + 0.5);  // Random value for each snowflake
-    }
-
+    shaderMaterial.alpha = 0.5;
     snowflakeMesh.material = shaderMaterial;
 
     //---------------SNOW ON GROUND------------------//
